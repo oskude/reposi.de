@@ -1,0 +1,108 @@
+#!/usr/bin/bash
+
+function MsgOk { printf "\033[0;32m${@}\033[0m\n"; }
+function MsgEr { printf "\033[0;31m${@}\033[0m\n"; }
+function MsgHi { printf "\033[0;33m${@}\033[0m\n"; }
+function Abort { MsgEr "$1"; exit 1; }
+
+function add_pkgs {
+	local arch=""
+	local file=""
+	local repodb="$MY_REPONAME.db.tar.gz"
+	local root="$MY_REPOROOT"
+	for pkg in $@
+	do
+		if [[ ! -f "$pkg" ]]; then
+			MsgHi "<pkg> is not a file: $pkg"
+			continue
+		fi
+		if [[ ! "$pkg" =~ ([^-\.]+)\.pkg\.tar\..* ]]; then
+			MsgHi "Could not parse <pkg> architecture: $pkg"
+			continue
+		fi
+		arch="${BASH_REMATCH[1]}"
+		file="${pkg##*/}"
+
+		if [[ $arch == "any" ]]; then
+			for repodir in "$root/"*; do
+				cp $pkg "$repodir/"
+				repo-add -R "$repodir/$repodb" "$repodir/$file"
+			done
+		else
+			repodir="$root/$arch"
+			if [[ ! -d "$repodir" ]]; then
+				MsgHi "Repo not a dir: $repodir"
+				continue
+			fi
+			cp $pkg "$repodir/"
+			repo-add -R "$repodir/$repodb" "$repodir/$file"
+		fi
+	done
+	create_indexhtml
+}
+
+function create_indexhtml {
+	local root="$MY_REPOROOT"
+	for repodir in "$root/"*/; do
+		local arch=$(basename $repodir)
+		echo "==> Creating updated index file '$repodir/index.html'"
+		cat <<- EOF > "$repodir/index.html"
+			<!doctype html><html><head>
+			<title>RepoSide ${arch}</title>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0">
+			<link href="../../main.css" rel="stylesheet"/>
+			<style>
+			article { max-width: 80ch; margin: auto; }
+			span { float: right; }
+			table { width: 100%; }
+			td:last-child { text-align: right; }
+			</style>
+			</head><body>
+			<article>
+			<h1><a href="https://reposi.de">RepoSide</a> <span>${arch}</span></h1>
+			<table><thead></thead><tbody>
+		EOF
+		for pkgfile in "$repodir/"*.pkg.*; do
+			mapfile -t pkginfo < <(tar xfO "$pkgfile" .PKGINFO)
+			local file="${pkgfile##*/}"
+			local name=""
+			local ver=""
+			local desc=""
+			local url=""
+			for line in "${pkginfo[@]}"; do
+				mapfile -td \= parts <<<"$line"
+				local key="${parts[0]}"
+				local val="${parts[1]}"
+				val="${val#"${val%%[![:space:]]*}"}"
+				key="${key%"${key##*[![:space:]]}"}"
+				val="${val%"${val##*[![:space:]]}"}"
+				[[ $key == "pkgname" ]] && name="$val"
+				[[ $key == "pkgver" ]] && ver="$val"
+				[[ $key == "pkgdesc" ]] && desc="$val"
+				[[ $key == "url" ]] && url="$val"
+			done
+			cat <<- EOF >> "$repodir/index.html"
+				<tr>
+				  <td>$name</td>
+				  <td>$ver</td>
+				  <td>$desc</td>
+				  <td><a href="$file">pkg</a></td>
+				  <td><a href="$url">url</a></td>
+				</tr>
+			EOF
+		done
+		cat <<- 'EOF' >> "$repodir/index.html"
+			</tbody></table></article>
+			</body></html>
+		EOF
+	done
+}
+
+MY_REPONAME="reposide"
+MY_REPOROOT=$(readlink -f "$(dirname "$0")")"/site/archlinux"
+
+if [[ $# -lt 1 ]]; then
+	Abort "Please provide package path(s) to add"
+fi
+
+add_pkgs $@

@@ -1,0 +1,32 @@
+:root {
+  color-scheme: dark light;
+}
+@media (prefers-color-scheme: dark) {
+	:root {
+		--color-bg: hsl(0, 0%, 13%);
+		--color-fg: hsl(0, 0%, 75%);
+		--color-link: hsl(30, 40%, 70%);
+	}
+}
+@media (prefers-color-scheme: light) {
+	:root {
+		--color-bg: #ddd;
+		--color-fg: #222;
+		--color-link: hsl(30, 100%, 23%);
+	}
+}
+html {
+	font-family: monospace;
+	background: var(--color-bg);
+	color: var(--color-fg);
+}
+a {
+	color: var(--color-link);
+	text-decoration: none;
+}
+a:hover {
+	text-decoration: underline;
+}
+h1 {
+	border-bottom: 1px solid var(--color-fg);
+}

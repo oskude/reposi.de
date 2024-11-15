@@ -1,0 +1,7 @@
+.*
+!.gitignore
+site/archlinux/**
+!site/archlinux/x86_64
+!site/archlinux/x86_64/.gitkeep
+!site/archlinux/aarch64
+!site/archlinux/aarch64/.gitkeep
